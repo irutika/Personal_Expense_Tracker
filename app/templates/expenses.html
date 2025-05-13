@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Expenses{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0 text-gray-800 mt-3">Your Expenses</h4>
+    <div>
+        <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-success btn-sm shadow-sm py-2 px-3 rounded"
+        style="background-color: #10b981; color: white; border: none; font-weight: 500;">
+            Add Expense
+        </a>
+        <button type="button" class="btn btn-primary btn-sm shadow-sm ms-2 py-2 px-3 rounded"
+                style="background-color: #10b981; color: white; border: none; font-weight: 500;"
+                data-bs-toggle="modal" data-bs-target="#budgetModal">
+            Manage Budgets
+        </button>
+        <form method="POST" action="{{ url_for('expenses.reset_budget') }}" class="d-inline">
+        </form>
+        
+    </div>
+</div>
+
+{% if expenses %}
+<div class="card shadow-sm rounded-lg">
+    <div class="card-body p-3">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Amount</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Date</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for expense in expenses %}
+                    <tr>
+                        <td>{{ currency_symbol }} {{ expense.amount }}</td>
+                        <td>{{ expense.category }}</td>
+                        <td>{{ expense.description }}</td>
+                        <td>{{ expense.date.strftime("%d-%m-%Y") }}</td>
+                        <td class="text-center">
+                            <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                            class="btn btn-sm btn-warning py-1 px-2 rounded"
+                            style="background-color: #facc15; color: #374151; font-size: 0.8rem;">
+                            ✏️
+                            </a>
+                            <form method="POST" action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
+                                style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this expense?');">
+                                <button type="submit" class="btn btn-sm btn-danger py-1 px-2 ms-1 rounded"
+                                        style="background-color: #f56565; color: white; font-size: 0.8rem;">
+                                        🗑️
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info rounded-lg mt-3 shadow-sm"
+    style="background-color: #e0f2f7; color: #0c5460;">
+    No expenses recorded yet. Click 'Add Expense' to get started!
+</div>
+{% endif %}
+
+<h4 class="mt-4 text-gray-800">Budget Overview</h4>
+<small class="text-muted mb-3 d-block">
+    Tracking expenses since: {{ user_settings.last_reset_at.strftime('%d-%m-%Y') }}
+    <br>
+Next reset on: <strong>{{ next_reset_date.strftime('%d-%m-%Y') }}</strong>
+
+</small>
+{% for item in category_status %}
+<div class="card shadow-sm rounded-lg mb-3">
+    <div class="card-body d-flex justify-content-between align-items-start">
+        <div>
+            <h6 class="card-title mb-2 text-black">{{ item.category }}</h6>
+            <p class="card-text text-gray-600">
+                Spent: {{ currency_symbol }}{{ item.spent|round(2) }} /
+                Budget: {{ currency_symbol }}{{ item.budget }}<br>
+                Remaining:
+                <strong class="{% if item.remaining < 0 %}text-danger{% else %}text-success{% endif %}">
+                    {{ currency_symbol }}{{ item.remaining|round(2) }}
+                </strong>
+            </p>
+
+            <div class="progress rounded-pill" style="height: 0.75rem;">
+                <div class="progress-bar rounded-pill
+                            {% if item.percent_used >= 90 %}bg-danger
+                            {% elif item.percent_used >= 70 %}bg-warning
+                            {% else %}bg-success{% endif %}"
+                    role="progressbar"
+                    style="width: {{ item.percent_used }}%;"
+                    aria-valuenow="{{ item.percent_used|round(1) }}"
+                    aria-valuemin="0"
+                    aria-valuemax="100">
+                </div>
+            </div>
+            <small class="d-block mt-2 fw-bold text-muted">
+                {{ item.percent_used|round(1) }}% used
+            </small>
+        </div>
+        <form method="POST" action="{{ url_for('expenses.delete_budget', budget_id=item['id']) }}"  style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this expense?');">
+            <button type="submit" class="btn btn-sm btn-danger py-1 px-2 ms-1 rounded"
+                    style="background-color: #f56565; color: white; font-size: 0.8rem;"> 
+                🗑️
+            </button>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Budget Modal -->
+<div class="modal fade" id="budgetModal" tabindex="-1" aria-labelledby="budgetModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content shadow-sm rounded-lg">
+            <div class="modal-header bg-light py-3">
+                <h5 class="modal-title text-gray-800" id="budgetModalLabel">Manage Budget</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <form method="POST" action="{{ url_for('expenses.manage_budget') }}">
+                    <div class="mb-3">
+                        <label for="category" class="form-label text-gray-700">Category</label>
+                        <select class="form-select rounded-pill" name="category" id="category" required>
+                            {% for category in categories %}
+                            <option value="{{ category }}">{{ category }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="budget" class="form-label text-gray-700">Set Budget ({{ currency_symbol }})</label>
+                        <input type="number" class="form-control rounded-pill" id="budget" name="budget"
+                            placeholder="Enter your budget" required>
+                    </div>
+                    <div class="d-grid mt-3">
+                        <button type="submit" class="btn btn-success py-2 rounded-pill"
+                                style="background-color: #10b981; color: white; font-weight: 500;">
+                            Save Budget
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
