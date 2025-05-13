@@ -44,9 +44,10 @@ def spending_chart():
 
     # Query expenses
     expenses = Expense.query.filter(
-        Expense.date >= start_date,
-        Expense.date <= end_date
-    ).all()
+    Expense.user_id == current_user.id,
+    Expense.date >= start_date,
+    Expense.date <= end_date
+).all()
 
     # Aggregate amounts
     for expense in expenses:
